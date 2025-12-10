@@ -9,12 +9,16 @@ const getClient = () => {
 };
 
 export const checkApiKey = async (): Promise<boolean> => {
+  // In AI Studio environment
   if (window.aistudio && window.aistudio.hasSelectedApiKey) {
     return await window.aistudio.hasSelectedApiKey();
   }
+  // In deployed environment (Vercel, etc.)
+  if (process.env.API_KEY && process.env.API_KEY !== 'PLACEHOLDER_API_KEY') {
+    return true;
+  }
   return false;
 };
-
 export const openApiKeySelection = async () => {
   if (window.aistudio && window.aistudio.openSelectKey) {
     await window.aistudio.openSelectKey();
