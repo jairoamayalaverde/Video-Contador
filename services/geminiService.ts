@@ -1,9 +1,10 @@
 import { GoogleGenAI, VideoGenerationReferenceType, VideoGenerationReferenceImage } from "@google/genai";
 
 const getClient = () => {
-  const apiKey = process.env.API_KEY;
-  if (!apiKey) {
-    throw new Error("API Key not found. Please select a key.");
+  // Try different sources for API key
+  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+    throw new Error("API Key not found. Please configure GEMINI_API_KEY in environment variables.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -14,14 +15,21 @@ export const checkApiKey = async (): Promise<boolean> => {
     return await window.aistudio.hasSelectedApiKey();
   }
   // In deployed environment (Vercel, etc.)
-  if (process.env.API_KEY && process.env.API_KEY !== 'PLACEHOLDER_API_KEY') {
+  // Check both process.env and Vite's import.meta.env
+  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+  if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
     return true;
   }
   return false;
 };
+
 export const openApiKeySelection = async () => {
+  // Only available in AI Studio environment
   if (window.aistudio && window.aistudio.openSelectKey) {
     await window.aistudio.openSelectKey();
+  } else {
+    // In deployed environment, show message
+    console.warn('API key selection is only available in AI Studio environment. Please configure GEMINI_API_KEY in environment variables.');
   }
 };
 
@@ -81,5 +89,6 @@ export const generateVideo = async (
   }
 
   // The URI requires the API key to be appended for access
-  return `${videoUri}&key=${process.env.API_KEY}`;
+  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+  return `${videoUri}&key=${apiKey}`;
 };
