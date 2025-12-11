@@ -1,7 +1,10 @@
 import { GoogleGenAI, VideoGenerationReferenceType, VideoGenerationReferenceImage } from "@google/genai";
 
+// 1. DEFINIMOS LOS FORMATOS VÁLIDOS (Para evitar errores de escritura)
+export type VideoAspectRatio = '16:9' | '9:16' | '1:1' | '4:3' | '3:4';
+
 const getClient = () => {
-  const apiKey = process.env.API_KEY;
+  const apiKey = process.env.API_KEY; // Nota: En Vite a veces es import.meta.env.VITE_GEMINI_API_KEY, pero respeto tu configuración actual.
   console.log('🔑 getClient - API_KEY:', apiKey ? 'EXISTS (length: ' + apiKey.length + ')' : 'UNDEFINED');
   if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY' || apiKey === 'undefined') {
     throw new Error("API Key not found. Please configure VITE_GEMINI_API_KEY in environment variables.");
@@ -12,13 +15,11 @@ const getClient = () => {
 export const checkApiKey = async (): Promise<boolean> => {
   console.log('🔍 checkApiKey called');
   
-  // In AI Studio environment
   if (window.aistudio && window.aistudio.hasSelectedApiKey) {
     console.log('✅ AI Studio environment detected');
     return await window.aistudio.hasSelectedApiKey();
   }
   
-  // In deployed environment (Vercel, etc.)
   console.log('🌐 Checking deployed environment');
   console.log('📊 process.env.API_KEY:', process.env.API_KEY);
   console.log('📊 Type:', typeof process.env.API_KEY);
@@ -36,7 +37,6 @@ export const checkApiKey = async (): Promise<boolean> => {
 };
 
 export const openApiKeySelection = async () => {
-  // Only available in AI Studio environment
   if (window.aistudio && window.aistudio.openSelectKey) {
     await window.aistudio.openSelectKey();
   } else {
@@ -44,9 +44,11 @@ export const openApiKeySelection = async () => {
   }
 };
 
+// 2. ACTUALIZAMOS LA FUNCIÓN PARA ACEPTAR EL FORMATO
 export const generateVideo = async (
   prompt: string,
-  referenceImageBase64: string | null
+  referenceImageBase64: string | null,
+  aspectRatio: VideoAspectRatio = '16:9' // Valor por defecto si no se envía nada
 ): Promise<string> => {
   const ai = getClient();
   
@@ -56,7 +58,7 @@ export const generateVideo = async (
   const config: any = {
     numberOfVideos: 1,
     resolution: '720p',
-    aspectRatio: '16:9',
+    aspectRatio: aspectRatio, // 3. AQUÍ USAMOS LA VARIABLE DINÁMICA
   };
 
   if (referenceImageBase64) {
