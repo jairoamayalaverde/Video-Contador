@@ -1,7 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { checkApiKey, openApiKeySelection, generateVideo } from './services/geminiService';
+// 1. IMPORTAMOS EL TIPO NUEVO VideoAspectRatio
+import { checkApiKey, openApiKeySelection, generateVideo, VideoAspectRatio } from './services/geminiService';
 import { Button } from './components/Button';
-import { Video, Upload, AlertCircle, Play, Download, Wand2, Image as ImageIcon, Info } from 'lucide-react';
+// 2. AÑADIMOS ICONOS NUEVOS (Smartphone, Monitor, Square, Tv)
+import { Video, Upload, AlertCircle, Play, Download, Wand2, Image as ImageIcon, Info, Smartphone, Monitor, Square, Tv } from 'lucide-react';
 
 const DEFAULT_PROMPT = `A 3D animated character of a friendly accountant with glasses and black hair, wearing a light blue shirt. He is sitting at a modern desk in a dimly lit room with blue neon accents. In front of him is a transparent holographic tablet. Floating in the air are holographic charts, graphs, and the text "PAQUETE PREMIUM". The character is looking directly at the camera with a welcoming smile and speaking with expressive gestures. The scene is cinematic and high-tech.`;
 
@@ -10,6 +12,10 @@ const App: React.FC = () => {
   const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
   const [scriptLine, setScriptLine] = useState<string>("Bienvenidos a Contador 4.0");
   const [refImage, setRefImage] = useState<string | null>(null);
+  
+  // 3. ESTADO PARA EL FORMATO DE VIDEO (Default: 16:9)
+  const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
+  
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
@@ -27,7 +33,6 @@ const App: React.FC = () => {
 
   const handleKeySelection = async () => {
     await openApiKeySelection();
-    // Re-check after selection attempt (assuming success or user retry)
     const exists = await checkApiKey();
     setHasKey(exists);
   };
@@ -55,11 +60,12 @@ const App: React.FC = () => {
     setStatusMessage("Initializing generation...");
 
     try {
-      // Combine prompt with the specific action script
       const fullPrompt = `${prompt} The character is saying: "${scriptLine}". He is welcoming the viewer enthusiastically.`;
       
-      setStatusMessage("Sending request to Veo...");
-      const url = await generateVideo(fullPrompt, refImage);
+      setStatusMessage(`Sending request to Veo (${aspectRatio})...`);
+      
+      // 4. PASAMOS EL ASPECT RATIO A LA FUNCIÓN
+      const url = await generateVideo(fullPrompt, refImage, aspectRatio);
       
       setVideoUrl(url);
       setStatusMessage("Generation complete!");
@@ -70,6 +76,21 @@ const App: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Helper para los botones de formato
+  const AspectRatioButton = ({ ratio, icon: Icon, label }: { ratio: VideoAspectRatio, icon: any, label: string }) => (
+    <button
+      onClick={() => setAspectRatio(ratio)}
+      className={`flex flex-col items-center justify-center p-3 rounded-lg border transition-all ${
+        aspectRatio === ratio 
+          ? 'bg-blue-500/20 border-blue-500 text-blue-400' 
+          : 'bg-[#0f172a] border-slate-700 text-slate-400 hover:border-slate-500 hover:bg-[#1e293b]'
+      }`}
+    >
+      <Icon className="w-5 h-5 mb-1" />
+      <span className="text-xs font-medium">{label}</span>
+    </button>
+  );
 
   if (!hasKey) {
     return (
@@ -193,6 +214,17 @@ const App: React.FC = () => {
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
                 </div>
+
+                {/* 5. SECCIÓN NUEVA: VIDEO FORMAT */}
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-2">Video Format</label>
+                  <div className="grid grid-cols-4 gap-2">
+                    <AspectRatioButton ratio="16:9" icon={Monitor} label="16:9" />
+                    <AspectRatioButton ratio="9:16" icon={Smartphone} label="9:16" />
+                    <AspectRatioButton ratio="1:1" icon={Square} label="1:1" />
+                    <AspectRatioButton ratio="4:3" icon={Tv} label="4:3" />
+                  </div>
+                </div>
               </div>
 
               <div className="mt-6">
@@ -263,7 +295,7 @@ const App: React.FC = () => {
                         </p>
                       </div>
                       <div className="bg-slate-800/50 rounded p-3 text-xs text-slate-500 font-mono">
-                         Status: {statusMessage}
+                          Status: {statusMessage}
                       </div>
                    </div>
                 ) : (
