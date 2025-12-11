@@ -2,22 +2,36 @@ import { GoogleGenAI, VideoGenerationReferenceType, VideoGenerationReferenceImag
 
 const getClient = () => {
   const apiKey = process.env.API_KEY;
-  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
+  console.log('🔑 getClient - API_KEY:', apiKey ? 'EXISTS (length: ' + apiKey.length + ')' : 'UNDEFINED');
+  if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY' || apiKey === 'undefined') {
     throw new Error("API Key not found. Please configure VITE_GEMINI_API_KEY in environment variables.");
   }
   return new GoogleGenAI({ apiKey });
 };
 
 export const checkApiKey = async (): Promise<boolean> => {
+  console.log('🔍 checkApiKey called');
+  
   // In AI Studio environment
   if (window.aistudio && window.aistudio.hasSelectedApiKey) {
+    console.log('✅ AI Studio environment detected');
     return await window.aistudio.hasSelectedApiKey();
   }
+  
   // In deployed environment (Vercel, etc.)
-  // Check if API key is available (it's replaced at build time by Vite)
-  if (process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== 'PLACEHOLDER_API_KEY') {
+  console.log('🌐 Checking deployed environment');
+  console.log('📊 process.env.API_KEY:', process.env.API_KEY);
+  console.log('📊 Type:', typeof process.env.API_KEY);
+  console.log('📊 Value exists:', !!process.env.API_KEY);
+  
+  if (process.env.API_KEY && 
+      process.env.API_KEY !== 'undefined' && 
+      process.env.API_KEY !== 'PLACEHOLDER_API_KEY') {
+    console.log('✅ API Key found in environment');
     return true;
   }
+  
+  console.log('❌ API Key NOT found');
   return false;
 };
 
@@ -26,7 +40,6 @@ export const openApiKeySelection = async () => {
   if (window.aistudio && window.aistudio.openSelectKey) {
     await window.aistudio.openSelectKey();
   } else {
-    // In deployed environment, show message
     console.warn('API key selection is only available in AI Studio environment. Please configure VITE_GEMINI_API_KEY in environment variables.');
   }
 };
@@ -38,7 +51,6 @@ export const generateVideo = async (
   const ai = getClient();
   
   // Configuration for Veo
-  // Using veo-3.1-generate-preview for high quality and reference image support.
   const model = 'veo-3.1-generate-preview';
   
   const config: any = {
@@ -48,15 +60,13 @@ export const generateVideo = async (
   };
 
   if (referenceImageBase64) {
-    // If we have a reference image, we attach it.
-    // We strip the data URL prefix if present for the raw bytes
     const base64Data = referenceImageBase64.replace(/^data:image\/\w+;base64,/, "");
     
     const referenceImages: VideoGenerationReferenceImage[] = [
       {
         image: {
           imageBytes: base64Data,
-          mimeType: 'image/png', // Assuming PNG or standard image conversion
+          mimeType: 'image/png',
         },
         referenceType: VideoGenerationReferenceType.ASSET, 
       }
@@ -70,9 +80,7 @@ export const generateVideo = async (
     config,
   });
 
-  // Polling loop
   while (!operation.done) {
-    // Wait 5 seconds between polls
     await new Promise(resolve => setTimeout(resolve, 5000));
     operation = await ai.operations.getVideosOperation({ operation: operation });
   }
@@ -86,6 +94,5 @@ export const generateVideo = async (
     throw new Error("No video URI returned");
   }
 
-  // The URI requires the API key to be appended for access
   return `${videoUri}&key=${process.env.API_KEY}`;
 };
