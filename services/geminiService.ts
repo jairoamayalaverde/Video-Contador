@@ -1,10 +1,9 @@
 import { GoogleGenAI, VideoGenerationReferenceType, VideoGenerationReferenceImage } from "@google/genai";
 
 const getClient = () => {
-  // Try different sources for API key
-  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
+  const apiKey = process.env.API_KEY;
   if (!apiKey || apiKey === 'PLACEHOLDER_API_KEY') {
-    throw new Error("API Key not found. Please configure GEMINI_API_KEY in environment variables.");
+    throw new Error("API Key not found. Please configure VITE_GEMINI_API_KEY in environment variables.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -15,9 +14,8 @@ export const checkApiKey = async (): Promise<boolean> => {
     return await window.aistudio.hasSelectedApiKey();
   }
   // In deployed environment (Vercel, etc.)
-  // Check both process.env and Vite's import.meta.env
-  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-  if (apiKey && apiKey !== 'PLACEHOLDER_API_KEY') {
+  // Check if API key is available (it's replaced at build time by Vite)
+  if (process.env.API_KEY && process.env.API_KEY !== 'undefined' && process.env.API_KEY !== 'PLACEHOLDER_API_KEY') {
     return true;
   }
   return false;
@@ -29,7 +27,7 @@ export const openApiKeySelection = async () => {
     await window.aistudio.openSelectKey();
   } else {
     // In deployed environment, show message
-    console.warn('API key selection is only available in AI Studio environment. Please configure GEMINI_API_KEY in environment variables.');
+    console.warn('API key selection is only available in AI Studio environment. Please configure VITE_GEMINI_API_KEY in environment variables.');
   }
 };
 
@@ -89,6 +87,5 @@ export const generateVideo = async (
   }
 
   // The URI requires the API key to be appended for access
-  const apiKey = process.env.API_KEY || import.meta.env.VITE_GEMINI_API_KEY;
-  return `${videoUri}&key=${apiKey}`;
+  return `${videoUri}&key=${process.env.API_KEY}`;
 };
