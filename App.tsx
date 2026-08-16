@@ -5,7 +5,7 @@ import { Button } from './components/Button';
 // 2. AÑADIMOS ICONOS NUEVOS (Smartphone, Monitor, Square, Tv)
 import { Video, Upload, AlertCircle, Play, Download, Wand2, Image as ImageIcon, Info, Smartphone, Monitor, Square, Tv } from 'lucide-react';
 
-const DEFAULT_PROMPT = `A 3D animated character of a friendly accountant with glasses and black hair, wearing a light blue shirt. He is sitting at a modern desk in a dimly lit room with blue neon accents. In front of him is a transparent holographic tablet. Floating in the air are holographic charts, graphs, and the text "PAQUETE PREMIUM". The character is looking directly at the camera with a welcoming smile and speaking with expressive gestures. The scene is cinematic and high-tech.`;
+const DEFAULT_PROMPT = `A professional presenter standing confidently in a minimalist, modern studio space with soft ambient lighting and subtle blue-purple accent tones. The scene has a clean, cinematic, high-tech quality. The character speaks with natural, expressive gestures and looks directly at the camera with a composed, professional demeanor. No on-screen text or graphics.`;
 
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(false);
