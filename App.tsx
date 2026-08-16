@@ -5,7 +5,7 @@ import { Button } from './components/Button';
 // 2. AÑADIMOS ICONOS NUEVOS (Smartphone, Monitor, Square, Tv)
 import { Video, Upload, AlertCircle, Play, Download, Wand2, Image as ImageIcon, Info, Smartphone, Monitor, Square, Tv } from 'lucide-react';
 
-const DEFAULT_PROMPT = `A professional presenter standing confidently in a minimalist, modern studio space with soft ambient lighting and subtle blue-purple accent tones. The scene has a clean, cinematic, high-tech quality. The character speaks with natural, expressive gestures and looks directly at the camera with a composed, professional demeanor. No on-screen text or graphics.`;
+const DEFAULT_PROMPT = "";
 
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(false);
@@ -61,7 +61,7 @@ const App: React.FC = () => {
     setStatusMessage("Initializing generation...");
 
     try {
-      const fullPrompt = `${prompt} The character is saying: "${scriptLine}". His/her tone is ${tone}.`;
+      const fullPrompt = `${prompt} The character is saying: "${scriptLine}". The tone is ${tone}.`;
       
       setStatusMessage(`Sending request to Veo (${aspectRatio})...`);
       
@@ -202,6 +202,7 @@ const App: React.FC = () => {
                     value={prompt}
                     onChange={(e) => setPrompt(e.target.value)}
                     rows={6}
+                    placeholder='Describe la escena, o si estás animando una imagen de referencia, escribe algo como: "No cambiar ni alterar los textos del frame, tampoco adicionar ningún elemento, gráfico o texto que no haga parte del frame."'
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                   />
                 </div>
