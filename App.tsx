@@ -10,7 +10,8 @@ const DEFAULT_PROMPT = `A 3D animated character of a friendly accountant with gl
 const App: React.FC = () => {
   const [hasKey, setHasKey] = useState<boolean>(false);
   const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
-  const [scriptLine, setScriptLine] = useState<string>("Bienvenidos a Contador 4.0");
+  const [scriptLine, setScriptLine] = useState<string>("Bienvenidos a TalkSync Studio");
+  const [tone, setTone] = useState<string>("confident and professional");
   const [refImage, setRefImage] = useState<string | null>(null);
   
   // 3. ESTADO PARA EL FORMATO DE VIDEO (Default: 16:9)
@@ -60,7 +61,7 @@ const App: React.FC = () => {
     setStatusMessage("Initializing generation...");
 
     try {
-      const fullPrompt = `${prompt} The character is saying: "${scriptLine}". He is welcoming the viewer enthusiastically.`;
+      const fullPrompt = `${prompt} The character is saying: "${scriptLine}". His/her tone is ${tone}.`;
       
       setStatusMessage(`Sending request to Veo (${aspectRatio})...`);
       
@@ -99,7 +100,7 @@ const App: React.FC = () => {
           <div className="w-16 h-16 bg-blue-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
             <Video className="w-8 h-8 text-blue-400" />
           </div>
-          <h1 className="text-2xl font-bold text-white mb-3">Welcome to Contador 4.0</h1>
+          <h1 className="text-2xl font-bold text-white mb-3">Welcome to TalkSync Studio</h1>
           <p className="text-slate-400 mb-8">
             To generate high-quality videos with Veo, you need to select a billing-enabled Google Cloud API Key.
           </p>
@@ -123,7 +124,7 @@ const App: React.FC = () => {
             <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-400 rounded-lg flex items-center justify-center">
               <Video className="w-5 h-5 text-white" />
             </div>
-            <span className="font-bold text-xl tracking-tight text-white">Contador 4.0 <span className="text-blue-400 text-sm font-normal">Veo Studio</span></span>
+            <span className="font-bold text-xl tracking-tight text-white">TalkSync <span className="text-blue-400 text-sm font-normal">Studio</span></span>
           </div>
           <div className="flex items-center gap-4">
              <button onClick={handleKeySelection} className="text-xs text-slate-500 hover:text-slate-300">
@@ -215,6 +216,17 @@ const App: React.FC = () => {
                   />
                 </div>
 
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">Tone / Mood</label>
+                  <input 
+                    type="text"
+                    value={tone}
+                    onChange={(e) => setTone(e.target.value)}
+                    placeholder="ej: confident and professional, serious and focused, calm..."
+                    className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
                 {/* 5. SECCIÓN NUEVA: VIDEO FORMAT */}
                 <div>
                   <label className="block text-sm font-medium text-slate-400 mb-2">Video Format</label>
@@ -262,7 +274,7 @@ const App: React.FC = () => {
                 {videoUrl && (
                   <a 
                     href={videoUrl} 
-                    download="contador-4.0.mp4"
+                    download="talksync-studio.mp4"
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-2 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition-colors"
