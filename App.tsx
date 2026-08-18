@@ -12,6 +12,11 @@ const App: React.FC = () => {
   const [prompt, setPrompt] = useState<string>(DEFAULT_PROMPT);
   const [scriptLine, setScriptLine] = useState<string>("Bienvenidos a TalkSync Studio");
   const [tone, setTone] = useState<string>("confident and professional");
+  // Si el frame de referencia NO tiene un personaje visible (ej. solo un
+  // screenshot de producto/UI), el Spoken Line debe ir como voz en off,
+  // no como diálogo de "el personaje está diciendo" — eso confundía al
+  // modelo cuando no había nadie en la imagen a quien atribuirle la voz.
+  const [hasCharacter, setHasCharacter] = useState<boolean>(true);
   const [refImage, setRefImage] = useState<string | null>(null);
   // Dimensiones reales (px) de la imagen de referencia subida, para poder
   // avisar si es muy chica o si no es 16:9 antes de gastar una generación.
@@ -80,7 +85,10 @@ const App: React.FC = () => {
     setStatusMessage("Initializing generation...");
 
     try {
-      const fullPrompt = `${prompt} The character is saying: "${scriptLine}". The tone is ${tone}.`;
+      const dialogueClause = hasCharacter
+        ? `The character is saying: "${scriptLine}". The tone is ${tone}.`
+        : `Voice-over narration (no on-screen speaker, the scene has no character): "${scriptLine}". The tone is ${tone}.`;
+      const fullPrompt = `${prompt} ${dialogueClause}`;
       
       setStatusMessage(`Sending request to Veo (${aspectRatio})...`);
       
@@ -244,14 +252,34 @@ const App: React.FC = () => {
                   />
                 </div>
 
+                <div className="flex items-center justify-between bg-[#0f172a] border border-slate-700 rounded-lg p-3">
+                  <label htmlFor="hasCharacter" className="text-sm font-medium text-slate-400 cursor-pointer">
+                    ¿El frame tiene un personaje visible?
+                  </label>
+                  <input
+                    id="hasCharacter"
+                    type="checkbox"
+                    checked={hasCharacter}
+                    onChange={(e) => setHasCharacter(e.target.checked)}
+                    className="w-4 h-4 accent-blue-500 cursor-pointer"
+                  />
+                </div>
+
                 <div>
-                  <label className="block text-sm font-medium text-slate-400 mb-1">Spoken Line (Action)</label>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">
+                    Spoken Line {hasCharacter ? '(Action)' : '(Voz en off)'}
+                  </label>
                   <input 
                     type="text"
                     value={scriptLine}
                     onChange={(e) => setScriptLine(e.target.value)}
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   />
+                  {!hasCharacter && (
+                    <p className="text-xs text-slate-500 mt-1">
+                      Sin personaje en el frame: esta línea se generará como narración en off, no como diálogo hablado.
+                    </p>
+                  )}
                 </div>
 
                 <div>
