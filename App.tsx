@@ -29,6 +29,14 @@ const App: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [videoUrl, setVideoUrl] = useState<string | null>(null);
   const [statusMessage, setStatusMessage] = useState<string>("");
+
+  // --- Chequeo de fidelidad de texto (OCR) ---
+  // Compara el texto real detectado en el frame de referencia contra el
+  // texto detectado en un frame del video ya generado, para no tener que
+  // revisar a ojo si el modelo corrompió el texto de la UI.
+  const [checkingFidelity, setCheckingFidelity] = useState<boolean>(false);
+  const [fidelityResult, setFidelityResult] = useState<{ expectedText: string; generatedText: string; similarity: number } | null>(null);
+  const [fidelityError, setFidelityError] = useState<string | null>(null);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -73,7 +81,105 @@ const App: React.FC = () => {
   const isLowRes = refImageDims ? (refImageDims.width < MIN_REF_WIDTH || refImageDims.height < MIN_REF_HEIGHT) : false;
   const isOffAspect = refAspectRatio !== null ? Math.abs(refAspectRatio - (16 / 9)) > 0.05 : false;
 
-  const handleGenerate = async () => {
+  // Normaliza texto (minúsculas, sin tildes, sin símbolos) para comparar
+  // de forma tolerante a diferencias menores de OCR.
+  const normalizeText = (t: string): string =>
+    t
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s]/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+
+  const levenshtein = (a: string, b: string): number => {
+    const m = a.length, n = b.length;
+    const dp: number[][] = Array.from({ length: m + 1 }, () => new Array(n + 1).fill(0));
+    for (let i = 0; i <= m; i++) dp[i][0] = i;
+    for (let j = 0; j <= n; j++) dp[0][j] = j;
+    for (let i = 1; i <= m; i++) {
+      for (let j = 1; j <= n; j++) {
+        dp[i][j] = a[i - 1] === b[j - 1]
+          ? dp[i - 1][j - 1]
+          : 1 + Math.min(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1]);
+      }
+    }
+    return dp[m][n];
+  };
+
+  const textSimilarity = (a: string, b: string): number => {
+    const na = normalizeText(a);
+    const nb = normalizeText(b);
+    if (!na && !nb) return 100;
+    const dist = levenshtein(na, nb);
+    const maxLen = Math.max(na.length, nb.length, 1);
+    return Math.max(0, Math.round((1 - dist / maxLen) * 100));
+  };
+
+  // Extrae un frame del video generado como imagen (dataURL), en un punto
+  // cercano al final pero no el último (que puede salir borroso por el
+  // efecto de zoom de cierre, ver notas del guion).
+  const extractFrameFromVideo = (url: string, atFraction: number = 0.85): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.src = url;
+
+      video.addEventListener('loadedmetadata', () => {
+        video.currentTime = Math.max(0, video.duration * atFraction);
+      });
+
+      video.addEventListener('seeked', () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('No se pudo crear el contexto de canvas.'));
+          return;
+        }
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+        try {
+          resolve(canvas.toDataURL('image/png'));
+        } catch (e) {
+          reject(new Error('El navegador bloqueó la lectura del frame por CORS (canvas "tainted"). El servidor de Veo no está devolviendo headers CORS que permitan leer el video en el navegador.'));
+        }
+      });
+
+      video.addEventListener('error', () => reject(new Error('No se pudo cargar el video para extraer el frame.')));
+    });
+  };
+
+  // Cargamos tesseract.js directo desde un CDN en tiempo de ejecución
+  // (sin necesidad de npm install / consola) usando import dinámico de URL,
+  // algo que los navegadores modernos soportan de forma nativa.
+  const runOCR = async (imageDataUrl: string): Promise<string> => {
+    // @ts-ignore - import de URL remota, TypeScript no lo tipa pero funciona en runtime
+    const Tesseract = await import(/* @vite-ignore */ 'https://cdn.jsdelivr.net/npm/tesseract.js@5/+esm');
+    const { data } = await Tesseract.recognize(imageDataUrl, 'spa');
+    return data.text;
+  };
+
+  const handleCheckFidelity = async () => {
+    if (!videoUrl || !refImage) return;
+    setCheckingFidelity(true);
+    setFidelityError(null);
+    setFidelityResult(null);
+    try {
+      const [expectedText, frameDataUrl] = await Promise.all([
+        runOCR(refImage),
+        extractFrameFromVideo(videoUrl, 0.85),
+      ]);
+      const generatedText = await runOCR(frameDataUrl);
+      const similarity = textSimilarity(expectedText, generatedText);
+      setFidelityResult({ expectedText, generatedText, similarity });
+    } catch (err: any) {
+      setFidelityError(err.message || 'No se pudo verificar la fidelidad del texto.');
+    } finally {
+      setCheckingFidelity(false);
+    }
+  };
     if (!hasKey) {
       await handleKeySelection();
       return;
@@ -83,6 +189,8 @@ const App: React.FC = () => {
     setError(null);
     setVideoUrl(null);
     setStatusMessage("Initializing generation...");
+    setFidelityResult(null);
+    setFidelityError(null);
 
     try {
       const dialogueClause = hasCharacter
@@ -338,16 +446,25 @@ const App: React.FC = () => {
                   Preview
                 </h2>
                 {videoUrl && (
-                  <a 
-                    href={videoUrl} 
-                    download="talksync-studio.mp4"
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-2 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition-colors"
-                  >
-                    <Download className="w-3 h-3" />
-                    Download MP4
-                  </a>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={handleCheckFidelity}
+                      disabled={checkingFidelity}
+                      className="flex items-center gap-2 text-xs font-medium bg-purple-600/20 hover:bg-purple-600/30 text-purple-300 border border-purple-500/30 px-3 py-1.5 rounded transition-colors disabled:opacity-50"
+                    >
+                      {checkingFidelity ? 'Verificando texto...' : 'Verificar texto (OCR)'}
+                    </button>
+                    <a 
+                      href={videoUrl} 
+                      download="talksync-studio.mp4"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="flex items-center gap-2 text-xs font-medium bg-slate-700 hover:bg-slate-600 text-white px-3 py-1.5 rounded transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      Download MP4
+                    </a>
+                  </div>
                 )}
               </div>
               
@@ -385,6 +502,49 @@ const App: React.FC = () => {
                   </div>
                 )}
               </div>
+
+              {(fidelityResult || fidelityError) && (
+                <div className="border-t border-slate-700 p-4 bg-[#0f172a]/50">
+                  {fidelityError && (
+                    <div className="flex items-start gap-2 text-xs text-amber-300">
+                      <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                      <p>{fidelityError}</p>
+                    </div>
+                  )}
+                  {fidelityResult && (
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="text-sm font-medium text-white">Fidelidad de texto (OCR)</span>
+                        <span className={`text-sm font-bold ${
+                          fidelityResult.similarity >= 85 ? 'text-emerald-400' :
+                          fidelityResult.similarity >= 60 ? 'text-amber-400' : 'text-red-400'
+                        }`}>
+                          {fidelityResult.similarity}%
+                        </span>
+                      </div>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+                        <div>
+                          <p className="text-slate-500 mb-1">Texto esperado (frame de referencia):</p>
+                          <p className="text-slate-300 bg-[#0f172a] border border-slate-700 rounded p-2 max-h-24 overflow-y-auto whitespace-pre-wrap">
+                            {fidelityResult.expectedText || '(sin texto detectado)'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-slate-500 mb-1">Texto detectado (video generado):</p>
+                          <p className="text-slate-300 bg-[#0f172a] border border-slate-700 rounded p-2 max-h-24 overflow-y-auto whitespace-pre-wrap">
+                            {fidelityResult.generatedText || '(sin texto detectado)'}
+                          </p>
+                        </div>
+                      </div>
+                      {fidelityResult.similarity < 85 && (
+                        <p className="text-xs text-amber-400 mt-2">
+                          ⚠️ Similitud baja — revisá el video manualmente, es probable que el texto haya salido corrompido.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
