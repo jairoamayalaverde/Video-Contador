@@ -13,7 +13,10 @@ const App: React.FC = () => {
   const [scriptLine, setScriptLine] = useState<string>("Bienvenidos a TalkSync Studio");
   const [tone, setTone] = useState<string>("confident and professional");
   const [refImage, setRefImage] = useState<string | null>(null);
-  
+  // Dimensiones reales (px) de la imagen de referencia subida, para poder
+  // avisar si es muy chica o si no es 16:9 antes de gastar una generación.
+  const [refImageDims, setRefImageDims] = useState<{ width: number; height: number } | null>(null);
+
   // 3. ESTADO PARA EL FORMATO DE VIDEO (Default: 16:9)
   const [aspectRatio, setAspectRatio] = useState<VideoAspectRatio>('16:9');
   
@@ -43,11 +46,27 @@ const App: React.FC = () => {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setRefImage(reader.result as string);
+        const dataUrl = reader.result as string;
+        setRefImage(dataUrl);
+
+        // Medimos el tamaño real en píxeles cargando la imagen en memoria.
+        const img = new window.Image();
+        img.onload = () => {
+          setRefImageDims({ width: img.naturalWidth, height: img.naturalHeight });
+        };
+        img.src = dataUrl;
       };
       reader.readAsDataURL(file);
     }
   };
+
+  // Referencia recomendada: 16:9 (igual que el output real de Veo) y al
+  // menos 1280x720 para no forzar un upscale que arruine el texto chico.
+  const MIN_REF_WIDTH = 1280;
+  const MIN_REF_HEIGHT = 720;
+  const refAspectRatio = refImageDims ? refImageDims.width / refImageDims.height : null;
+  const isLowRes = refImageDims ? (refImageDims.width < MIN_REF_WIDTH || refImageDims.height < MIN_REF_HEIGHT) : false;
+  const isOffAspect = refAspectRatio !== null ? Math.abs(refAspectRatio - (16 / 9)) > 0.05 : false;
 
   const handleGenerate = async () => {
     if (!hasKey) {
@@ -173,6 +192,24 @@ const App: React.FC = () => {
                     <div className="absolute inset-0 flex items-center justify-center opacity-0 hover:opacity-100 bg-black/50 transition-opacity rounded">
                       <p className="text-white text-sm font-medium">Click to change</p>
                     </div>
+                    {refImageDims && (
+                      <div className="mt-2 text-xs" onClick={(e) => e.stopPropagation()}>
+                        <span className={isLowRes || isOffAspect ? 'text-amber-400' : 'text-emerald-400'}>
+                          {refImageDims.width}×{refImageDims.height}px
+                          {refAspectRatio !== null && ` · ${refAspectRatio.toFixed(2)}:1`}
+                        </span>
+                        {isOffAspect && (
+                          <p className="text-amber-400 mt-1">
+                            ⚠️ No es 16:9 — Veo genera en 16:9 real, así que esta imagen se va a recortar/estirar.
+                          </p>
+                        )}
+                        {isLowRes && (
+                          <p className="text-amber-400 mt-1">
+                            ⚠️ Menor a 1280×720 — el modelo tendrá que hacer upscale, lo que puede afectar la nitidez del texto.
+                          </p>
+                        )}
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <div className="cursor-pointer space-y-3">
