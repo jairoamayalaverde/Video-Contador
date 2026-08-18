@@ -180,6 +180,8 @@ const App: React.FC = () => {
       setCheckingFidelity(false);
     }
   };
+
+  const handleGenerate = async () => {
     if (!hasKey) {
       await handleKeySelection();
       return;
