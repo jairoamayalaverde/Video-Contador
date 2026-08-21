@@ -86,13 +86,20 @@ export const generateVideo = async (
   };
 
   if (referenceImageBase64) {
+    // Detectamos el mime type real del archivo (jpeg, png, webp, etc.)
+    // en vez de asumir siempre 'image/png', que corrompía la referencia
+    // cuando el screenshot subido era .jpg (el caso más común).
+    const mimeMatch = referenceImageBase64.match(/^data:(image\/\w+);base64,/);
+    const detectedMimeType = mimeMatch ? mimeMatch[1] : 'image/png';
     const base64Data = referenceImageBase64.replace(/^data:image\/\w+;base64,/, "");
-    
+
+    console.log(`🖼️ Reference image mimeType detected: ${detectedMimeType}`);
+
     const referenceImages: VideoGenerationReferenceImage[] = [
       {
         image: {
           imageBytes: base64Data,
-          mimeType: 'image/png',
+          mimeType: detectedMimeType,
         },
         referenceType: VideoGenerationReferenceType.ASSET, 
       }
@@ -118,7 +125,18 @@ export const generateVideo = async (
 
   const videoUri = operation.response?.generatedVideos?.[0]?.video?.uri;
   if (!videoUri) {
-    throw new Error("No video URI returned");
+    // Log todo lo que Google mandó de vuelta: a veces la causa real
+    // (cuota agotada, filtro de seguridad, contenido rechazado) viene acá
+    // aunque operation.error no esté seteado.
+    console.error('❌ No video URI. Operation completa:', JSON.stringify(operation, null, 2));
+    console.error('❌ operation.response completo:', JSON.stringify(operation.response, null, 2));
+
+    const generatedVideos = operation.response?.generatedVideos;
+    let reason = 'Causa desconocida — revisá el log de operation.response en la consola para más detalle.';
+    if (!generatedVideos || generatedVideos.length === 0) {
+      reason = 'Google no generó ningún video para este pedido. Las causas más comunes: cuota de API agotada, o el contenido/imagen de referencia fue filtrado por políticas de seguridad (ej. generación de personas sin aprobación de proyecto).';
+    }
+    throw new Error(`No video URI returned. ${reason}`);
   }
 
   // Añadimos la key a la URL para que el frontend pueda reproducirla si es necesario en este entorno
