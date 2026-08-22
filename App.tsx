@@ -17,6 +17,25 @@ const App: React.FC = () => {
   // no como diálogo de "el personaje está diciendo" — eso confundía al
   // modelo cuando no había nadie en la imagen a quien atribuirle la voz.
   const [hasCharacter, setHasCharacter] = useState<boolean>(true);
+
+  // Ancla de voz: Veo no mantiene la identidad de voz entre llamadas
+  // separadas si no se la describís explícitamente cada vez — sin esto,
+  // cada clip puede sonar con una voz distinta aunque sea "el mismo
+  // personaje". Usá la MISMA descripción en todos los clips de una campaña.
+  const [voiceAnchor, setVoiceAnchor] = useState<string>(
+    "male voice, warm, confident, neutral Latin American Spanish accent, mid-30s, consistent across all clips"
+  );
+
+  // Seed: no garantiza determinismo total (según la doc oficial de Veo),
+  // pero lo mejora. Reutilizar el mismo seed entre clips de una misma
+  // campaña ayuda a la consistencia general.
+  const [seed, setSeed] = useState<string>("");
+
+  // Evita que el modelo agregue texto/gráficos en pantalla que vos no
+  // pediste (ej. un CTA inventado cuando el Spoken Line menciona un sitio
+  // web). Se puede desactivar si en algún clip sí querés que el modelo
+  // agregue texto libremente.
+  const [suppressExtraText, setSuppressExtraText] = useState<boolean>(true);
   const [refImage, setRefImage] = useState<string | null>(null);
   // Dimensiones reales (px) de la imagen de referencia subida, para poder
   // avisar si es muy chica o si no es 16:9 antes de gastar una generación.
@@ -196,14 +215,17 @@ const App: React.FC = () => {
 
     try {
       const dialogueClause = hasCharacter
-        ? `The character is saying: "${scriptLine}". The tone is ${tone}.`
-        : `Voice-over narration (no on-screen speaker, the scene has no character): "${scriptLine}". The tone is ${tone}.`;
-      const fullPrompt = `${prompt} ${dialogueClause}`;
+        ? `The character is saying: "${scriptLine}". The tone is ${tone}. Voice: ${voiceAnchor}.`
+        : `Voice-over narration (no on-screen speaker, the scene has no character): "${scriptLine}". The tone is ${tone}. Voice: ${voiceAnchor}.`;
+      const noTextClause = suppressExtraText
+        ? " Do not add any new on-screen text, captions, subtitles, logos, or graphic overlays beyond what is already visible in the reference image."
+        : "";
+      const fullPrompt = `${prompt} ${dialogueClause}${noTextClause}`;
       
       setStatusMessage(`Sending request to Veo (${aspectRatio})...`);
       
-      // 4. PASAMOS EL ASPECT RATIO A LA FUNCIÓN
-      const url = await generateVideo(fullPrompt, refImage, aspectRatio);
+      // 4. PASAMOS EL ASPECT RATIO Y EL SEED A LA FUNCIÓN
+      const url = await generateVideo(fullPrompt, refImage, aspectRatio, seed ? Number(seed) : undefined);
       
       setVideoUrl(url);
       setStatusMessage("Generation complete!");
@@ -400,6 +422,51 @@ const App: React.FC = () => {
                     onChange={(e) => setTone(e.target.value)}
                     placeholder="ej: confident and professional, serious and focused, calm..."
                     className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">
+                    Voice Anchor <span className="text-slate-600">(usá la misma en todos los clips de la campaña)</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={voiceAnchor}
+                    onChange={(e) => setVoiceAnchor(e.target.value)}
+                    placeholder="ej: male voice, warm, confident, neutral Latin American Spanish accent, mid-30s"
+                    className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    Veo no mantiene la identidad de voz entre generaciones separadas — describirla explícitamente reduce el "voice drift" entre clips.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-slate-400 mb-1">
+                    Seed <span className="text-slate-600">(opcional — mismo número en todos los clips de la campaña)</span>
+                  </label>
+                  <input
+                    type="number"
+                    value={seed}
+                    onChange={(e) => setSeed(e.target.value)}
+                    placeholder="ej: 42"
+                    className="w-full bg-[#0f172a] border border-slate-700 rounded-lg p-3 text-sm text-slate-200 placeholder-slate-600 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  />
+                  <p className="text-xs text-slate-500 mt-1">
+                    No garantiza resultados idénticos, pero mejora la consistencia (según la documentación oficial de Veo).
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between bg-[#0f172a] border border-slate-700 rounded-lg p-3">
+                  <label htmlFor="suppressExtraText" className="text-sm font-medium text-slate-400 cursor-pointer">
+                    Evitar texto/gráficos extra no pedidos
+                  </label>
+                  <input
+                    id="suppressExtraText"
+                    type="checkbox"
+                    checked={suppressExtraText}
+                    onChange={(e) => setSuppressExtraText(e.target.checked)}
+                    className="w-4 h-4 accent-blue-500 cursor-pointer"
                   />
                 </div>
 
