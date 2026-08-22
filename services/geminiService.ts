@@ -43,7 +43,8 @@ export const openApiKeySelection = async () => {
 export const generateVideo = async (
   prompt: string,
   referenceImageBase64: string | null,
-  aspectRatioSelection: VideoAspectRatio = '16:9' // Recibimos la selección del usuario
+  aspectRatioSelection: VideoAspectRatio = '16:9', // Recibimos la selección del usuario
+  seed?: number // Opcional: mejora la consistencia entre generaciones (no la garantiza)
 ): Promise<string> => {
   const ai = getClient();
   // Modelo actual en preview pública
@@ -84,6 +85,11 @@ export const generateVideo = async (
     // ¡IMPORTANTE! Hardcodeamos 16:9 aquí para evitar el error 400 de Google
     aspectRatio: '16:9', 
   };
+
+  if (typeof seed === 'number' && !Number.isNaN(seed)) {
+    config.seed = seed;
+    console.log(`🌱 Usando seed: ${seed}`);
+  }
 
   if (referenceImageBase64) {
     // Detectamos el mime type real del archivo (jpeg, png, webp, etc.)
